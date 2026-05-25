@@ -1,0 +1,254 @@
+==================
+WARNING: ThreadSanitizer: data race (pid=1212936)
+  Read of size 8 at 0x7ffe65bdf820 by thread T2:
+    #0 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:95 (stress_test+0x3c75) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3c75)
+    #2 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3c75)
+    #3 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3c75)
+    #4 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3c75)
+    #5 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3c75)
+    #6 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Previous write of size 8 at 0x7ffe65bdf820 by thread T1:
+    #0 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:89 (stress_test+0x3de0) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3de0)
+    #2 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3de0)
+    #3 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3de0)
+    #4 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3de0)
+    #5 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3de0)
+    #6 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Location is stack of main thread.
+
+  Location is global '<null>' at 0x000000000000 ([stack]+0x1f820)
+
+  Thread T2 (tid=1212939, running) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+  Thread T1 (tid=1212938, finished) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+SUMMARY: ThreadSanitizer: data race /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:95 in operator()
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=1212936)
+  Read of size 8 at 0x7ffe65bdf858 by thread T2:
+    #0 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::size() const /usr/include/c++/13/bits/basic_string.h:1072 (stress_test+0x3cc0) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::assign(char const*) /usr/include/c++/13/bits/basic_string.h:1684 (stress_test+0x3cc0)
+    #2 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::operator=(char const*) /usr/include/c++/13/bits/basic_string.h:824 (stress_test+0x3cc0)
+    #3 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:97 (stress_test+0x3cc0)
+    #4 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3cc0)
+    #5 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3cc0)
+    #6 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3cc0)
+    #7 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3cc0)
+    #8 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3cc0)
+    #9 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Previous write of size 8 at 0x7ffe65bdf858 by thread T1:
+    #0 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_length(unsigned long) /usr/include/c++/13/bits/basic_string.h:218 (stress_test+0x3e52) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_set_length(unsigned long) /usr/include/c++/13/bits/basic_string.h:256 (stress_test+0x3e52)
+    #2 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_replace(unsigned long, unsigned long, char const*, unsigned long) /usr/include/c++/13/bits/basic_string.tcc:550 (stress_test+0x3e52)
+    #3 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::assign(char const*) /usr/include/c++/13/bits/basic_string.h:1684 (stress_test+0x3e52)
+    #4 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::operator=(char const*) /usr/include/c++/13/bits/basic_string.h:824 (stress_test+0x3e52)
+    #5 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:90 (stress_test+0x3e52)
+    #6 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3e52)
+    #7 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3e52)
+    #8 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3e52)
+    #9 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3e52)
+    #10 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3e52)
+    #11 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Location is stack of main thread.
+
+  Location is global '<null>' at 0x000000000000 ([stack]+0x1f858)
+
+  Thread T2 (tid=1212939, running) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+  Thread T1 (tid=1212938, finished) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+SUMMARY: ThreadSanitizer: data race /usr/include/c++/13/bits/basic_string.h:1072 in std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::size() const
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=1212936)
+  Write of size 1 at 0x7ffe65bdf860 by thread T2:
+    #0 std::char_traits<char>::assign(char&, char const&) /usr/include/c++/13/bits/char_traits.h:358 (stress_test+0x3d02) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_S_copy(char*, char const*, unsigned long) /usr/include/c++/13/bits/basic_string.h:428 (stress_test+0x3d02)
+    #2 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_replace(unsigned long, unsigned long, char const*, unsigned long) /usr/include/c++/13/bits/basic_string.tcc:542 (stress_test+0x3d02)
+    #3 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::assign(char const*) /usr/include/c++/13/bits/basic_string.h:1684 (stress_test+0x3d02)
+    #4 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::operator=(char const*) /usr/include/c++/13/bits/basic_string.h:824 (stress_test+0x3d02)
+    #5 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:97 (stress_test+0x3d02)
+    #6 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3d02)
+    #7 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3d02)
+    #8 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3d02)
+    #9 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3d02)
+    #10 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3d02)
+    #11 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Previous write of size 1 at 0x7ffe65bdf860 by thread T1:
+    #0 std::char_traits<char>::assign(char&, char const&) /usr/include/c++/13/bits/char_traits.h:358 (stress_test+0x3e46) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_S_copy(char*, char const*, unsigned long) /usr/include/c++/13/bits/basic_string.h:428 (stress_test+0x3e46)
+    #2 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_replace(unsigned long, unsigned long, char const*, unsigned long) /usr/include/c++/13/bits/basic_string.tcc:542 (stress_test+0x3e46)
+    #3 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::assign(char const*) /usr/include/c++/13/bits/basic_string.h:1684 (stress_test+0x3e46)
+    #4 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::operator=(char const*) /usr/include/c++/13/bits/basic_string.h:824 (stress_test+0x3e46)
+    #5 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:90 (stress_test+0x3e46)
+    #6 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3e46)
+    #7 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3e46)
+    #8 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3e46)
+    #9 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3e46)
+    #10 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3e46)
+    #11 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Location is stack of main thread.
+
+  Location is global '<null>' at 0x000000000000 ([stack]+0x1f860)
+
+  Thread T2 (tid=1212939, running) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+  Thread T1 (tid=1212938, finished) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+SUMMARY: ThreadSanitizer: data race /usr/include/c++/13/bits/char_traits.h:358 in std::char_traits<char>::assign(char&, char const&)
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=1212936)
+  Write of size 8 at 0x7ffe65bdf820 by thread T4:
+    #0 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:96 (stress_test+0x3c9c) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3c9c)
+    #2 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3c9c)
+    #3 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3c9c)
+    #4 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3c9c)
+    #5 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3c9c)
+    #6 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Previous write of size 8 at 0x7ffe65bdf820 by thread T3:
+    #0 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:89 (stress_test+0x3de0) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3de0)
+    #2 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3de0)
+    #3 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3de0)
+    #4 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3de0)
+    #5 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3de0)
+    #6 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Location is stack of main thread.
+
+  Location is global '<null>' at 0x000000000000 ([stack]+0x1f820)
+
+  Thread T4 (tid=1212941, running) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+  Thread T3 (tid=1212940, finished) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+SUMMARY: ThreadSanitizer: data race /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:96 in operator()
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=1212936)
+  Write of size 8 at 0x7ffe65bdf858 by thread T4:
+    #0 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_length(unsigned long) /usr/include/c++/13/bits/basic_string.h:218 (stress_test+0x3d0e) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_set_length(unsigned long) /usr/include/c++/13/bits/basic_string.h:256 (stress_test+0x3d0e)
+    #2 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_replace(unsigned long, unsigned long, char const*, unsigned long) /usr/include/c++/13/bits/basic_string.tcc:550 (stress_test+0x3d0e)
+    #3 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::assign(char const*) /usr/include/c++/13/bits/basic_string.h:1684 (stress_test+0x3d0e)
+    #4 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::operator=(char const*) /usr/include/c++/13/bits/basic_string.h:824 (stress_test+0x3d0e)
+    #5 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:97 (stress_test+0x3d0e)
+    #6 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3d0e)
+    #7 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3d0e)
+    #8 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3d0e)
+    #9 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3d0e)
+    #10 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3d0e)
+    #11 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Previous write of size 8 at 0x7ffe65bdf858 by thread T3:
+    #0 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_length(unsigned long) /usr/include/c++/13/bits/basic_string.h:218 (stress_test+0x3e52) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_set_length(unsigned long) /usr/include/c++/13/bits/basic_string.h:256 (stress_test+0x3e52)
+    #2 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_replace(unsigned long, unsigned long, char const*, unsigned long) /usr/include/c++/13/bits/basic_string.tcc:550 (stress_test+0x3e52)
+    #3 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::assign(char const*) /usr/include/c++/13/bits/basic_string.h:1684 (stress_test+0x3e52)
+    #4 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::operator=(char const*) /usr/include/c++/13/bits/basic_string.h:824 (stress_test+0x3e52)
+    #5 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:90 (stress_test+0x3e52)
+    #6 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3e52)
+    #7 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3e52)
+    #8 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3e52)
+    #9 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3e52)
+    #10 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3e52)
+    #11 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Location is stack of main thread.
+
+  Location is global '<null>' at 0x000000000000 ([stack]+0x1f858)
+
+  Thread T4 (tid=1212941, running) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+  Thread T3 (tid=1212940, finished) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+SUMMARY: ThreadSanitizer: data race /usr/include/c++/13/bits/basic_string.h:218 in std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_length(unsigned long)
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=1212936)
+  Write of size 1 at 0x7ffe65bdf861 by thread T4:
+    #0 std::char_traits<char>::assign(char&, char const&) /usr/include/c++/13/bits/char_traits.h:358 (stress_test+0x3d2a) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_set_length(unsigned long) /usr/include/c++/13/bits/basic_string.h:257 (stress_test+0x3d2a)
+    #2 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_replace(unsigned long, unsigned long, char const*, unsigned long) /usr/include/c++/13/bits/basic_string.tcc:550 (stress_test+0x3d2a)
+    #3 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::assign(char const*) /usr/include/c++/13/bits/basic_string.h:1684 (stress_test+0x3d2a)
+    #4 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::operator=(char const*) /usr/include/c++/13/bits/basic_string.h:824 (stress_test+0x3d2a)
+    #5 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:97 (stress_test+0x3d2a)
+    #6 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3d2a)
+    #7 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3d2a)
+    #8 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3d2a)
+    #9 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3d2a)
+    #10 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3d2a)
+    #11 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Previous write of size 1 at 0x7ffe65bdf861 by thread T3:
+    #0 std::char_traits<char>::assign(char&, char const&) /usr/include/c++/13/bits/char_traits.h:358 (stress_test+0x3e6e) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+    #1 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_set_length(unsigned long) /usr/include/c++/13/bits/basic_string.h:257 (stress_test+0x3e6e)
+    #2 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_replace(unsigned long, unsigned long, char const*, unsigned long) /usr/include/c++/13/bits/basic_string.tcc:550 (stress_test+0x3e6e)
+    #3 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::assign(char const*) /usr/include/c++/13/bits/basic_string.h:1684 (stress_test+0x3e6e)
+    #4 std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::operator=(char const*) /usr/include/c++/13/bits/basic_string.h:824 (stress_test+0x3e6e)
+    #5 operator() /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:90 (stress_test+0x3e6e)
+    #6 __invoke_impl<void, test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:61 (stress_test+0x3e6e)
+    #7 __invoke<test_unsafe(int)::<lambda()> > /usr/include/c++/13/bits/invoke.h:96 (stress_test+0x3e6e)
+    #8 _M_invoke<0> /usr/include/c++/13/bits/std_thread.h:292 (stress_test+0x3e6e)
+    #9 operator() /usr/include/c++/13/bits/std_thread.h:299 (stress_test+0x3e6e)
+    #10 _M_run /usr/include/c++/13/bits/std_thread.h:244 (stress_test+0x3e6e)
+    #11 <null> <null> (libstdc++.so.6+0xecdb3) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+
+  Location is stack of main thread.
+
+  Location is global '<null>' at 0x000000000000 ([stack]+0x1f861)
+
+  Thread T4 (tid=1212941, running) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+  Thread T3 (tid=1212940, finished) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xeceb0) (BuildId: 753c6c8608b61d4e67be8f0c890e03e0aa046b8b)
+    #2 main /home/vitor/knn-concorrent-cpp/benchmark/KNNConcurrencyStressTest.cpp:285 (stress_test+0x59ba) (BuildId: 9516cadfc2997b5b8a8667fda6b1f73f6ef1ef64)
+
+SUMMARY: ThreadSanitizer: data race /usr/include/c++/13/bits/char_traits.h:358 in std::char_traits<char>::assign(char&, char const&)
+==================

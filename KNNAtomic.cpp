@@ -3,11 +3,12 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <queue>
+#include <list>
 #include <cmath>
 #include <map>
 #include <thread>
-#include <mutex>
+#include <atomic>
+#include <memory>
 #include <algorithm>
 
 /**
@@ -49,41 +50,73 @@ struct ChunkBounds {
 };
 
 /**
- * @class KNNLock
- * @brief Implements KNN using parallel platform threads and a std::recursive_mutex with
- * explicit lock/unlock via std::unique_lock.
- * Protects the shared global heap at every line insertion.
+ * @class ImmutableTopK
+ * @brief Immutable snapshot of the current best K neighbors, sorted ascending by distance.
+ *        Each update produces a NEW object — the original is never modified.
+ *        This immutability is what makes lock-free CAS safe.
+ *        Equivalent to the ImmutableTopK inner class in Java KNNAtomic.
  */
-class KNNLock {
+class ImmutableTopK {
+public:
+    std::vector<DistanceRecord> list;
+    int k;
+
+    explicit ImmutableTopK(int k) : k(k) {}
+
+    ImmutableTopK(std::vector<DistanceRecord> list, int k)
+        : list(std::move(list)), k(k) {}
+
+    /**
+     * @brief Evaluates a new record and returns a new snapshot if it qualifies.
+     *        Returns nullptr if the record does not improve the current top-K.
+     *        Equivalent to tryUpdate() in Java KNNAtomic.
+     */
+    std::shared_ptr<ImmutableTopK> tryUpdate(const DistanceRecord& record) const {
+        if ((int)list.size() < k) {
+            std::vector<DistanceRecord> newList = list;
+            newList.push_back(record);
+            std::sort(newList.begin(), newList.end());
+            return std::make_shared<ImmutableTopK>(std::move(newList), k);
+        }
+
+        const DistanceRecord& worst = list.back();
+        if (record.distance < worst.distance) {
+            std::vector<DistanceRecord> newList = list;
+            newList.pop_back();
+            newList.push_back(record);
+            std::sort(newList.begin(), newList.end());
+            return std::make_shared<ImmutableTopK>(std::move(newList), k);
+        }
+
+        return nullptr;
+    }
+};
+
+/**
+ * @class KNNAtomic
+ * @brief Implements KNN using parallel platform threads and a lock-free shared
+ *        global state managed by std::atomic<std::shared_ptr<ImmutableTopK>>.
+ *        Uses CAS (Compare-And-Swap) loops to update state without any mutex.
+ *        Equivalent to the Java KNNAtomic using AtomicReference<ImmutableTopK>.
+ */
+class KNNAtomic {
 public:
 
     /**
-     * @brief Entry point for the lock-based parallel classification.
-     *
-     * @param filePath  Path to the CSV dataset file.
-     * @param target    The data point to classify.
-     * @param k         Number of nearest neighbors to consider.
-     * @return          Predicted class label, or "Unknown" if no valid data found.
+     * @brief Entry point for the lock-free atomic parallel classification.
      */
     std::string predictStream(const std::string& filePath, const Neighbor& target, int k) {
         int numThreads = std::max(2u, std::thread::hardware_concurrency());
-        std::cout << "[ReentrantLock] Using " << numThreads
-                  << " platform threads with shared global queue synchronization" << std::endl;
+        std::cout << "[Atomic] Using " << numThreads
+                  << " platform threads with lock-free AtomicReference" << std::endl;
         return runParallel(filePath, target, k, numThreads);
     }
 
 private:
 
     /**
-     * @brief Manages the full parallel execution lifecycle.
-     * Creates a shared global heap and a mutex, spawns threads,
-     * joins all, and returns the majority vote.
-     *
-     * @param filePath    Path to the CSV dataset file.
-     * @param target      The data point to classify.
-     * @param k           Number of nearest neighbors to consider.
-     * @param numThreads  Number of platform threads to deploy.
-     * @return            Predicted class label, or "Unknown" on failure.
+     * @brief Manages the full lock-free parallel execution.
+     *        Initializes the atomic reference, spawns threads, joins, and reads final state.
      */
     std::string runParallel(const std::string& filePath, const Neighbor& target, int k, int numThreads) {
         std::vector<ChunkBounds> chunks = computeChunks(filePath, numThreads);
@@ -92,16 +125,19 @@ private:
             return "Unknown";
         }
 
-        std::priority_queue<DistanceRecord> globalTopK;
+        std::cout << "[runParallel] " << chunks.size()
+                  << " chunks | target dim=" << target.values.size() << std::endl;
 
-        std::recursive_mutex lock;
+        std::atomic<std::shared_ptr<ImmutableTopK>> globalTopK(
+            std::make_shared<ImmutableTopK>(k)
+        );
 
         std::vector<std::thread> threads;
         threads.reserve(chunks.size());
 
         for (int i = 0; i < (int)chunks.size(); i++) {
-            threads.emplace_back([this, &filePath, &chunks, &target, &globalTopK, &lock, i, k]() {
-                processChunk(filePath, chunks[i], target, k, globalTopK, lock);
+            threads.emplace_back([this, &filePath, &chunks, &target, &globalTopK, i, k]() {
+                processChunk(filePath, chunks[i], target, k, globalTopK);
             });
         }
 
@@ -109,34 +145,31 @@ private:
             if (t.joinable()) t.join();
         }
 
-        if (globalTopK.empty()) {
+        auto finalResult = globalTopK.load();
+        if (finalResult->list.empty()) {
             std::cerr << "Error: no valid neighbors found." << std::endl;
             return "Unknown";
         }
 
-        return majorityVote(globalTopK);
+        return majorityVote(finalResult->list);
     }
 
     /**
-     * @brief Processes a single file chunk.
-     * Parse and distance are done outside the lock.
-     * Only the heap insertion is protected.
-     * Uses std::unique_lock for explicit lock/unlock with RAII safety.
+     * @brief Processes a single chunk using fast-path and slow-path CAS loop.
      *
-     * @param filePath   Path to the CSV file.
-     * @param chunk      Byte boundaries for this thread.
-     * @param target     The data point to classify.
-     * @param k          Number of nearest neighbors to maintain.
-     * @param globalTopK Shared max-heap — written under lock.
-     * @param lock       Recursive Mutex protecting globalTopK.
+     *        FAST-PATH: pure volatile read — discards records that can't qualify
+     *        without touching the CAS loop. Equivalent to the fast-path in Java.
+     *
+     *        SLOW-PATH: optimistic CAS loop — creates a new ImmutableTopK and
+     *        atomically swaps the pointer only if state hasn't changed.
+     *        Equivalent to the while(true) CAS loop in Java KNNAtomic.
      */
     void processChunk(
         const std::string& filePath,
         const ChunkBounds& chunk,
         const Neighbor& target,
         int k,
-        std::priority_queue<DistanceRecord>& globalTopK,
-        std::recursive_mutex& lock)
+        std::atomic<std::shared_ptr<ImmutableTopK>>& globalTopK)
     {
         std::ifstream file(filePath, std::ios::binary);
         if (!file.is_open()) return;
@@ -156,17 +189,35 @@ private:
             }
 
             double dist = calculateEuclideanDistance(target, *current);
+
+            {
+                auto currentTopK = globalTopK.load(std::memory_order_acquire);
+                if ((int)currentTopK->list.size() == k &&
+                    dist >= currentTopK->list.back().distance) {
+                    delete current;
+                    continue;
+                }
+            }
+
             DistanceRecord record(*current, dist);
             delete current;
 
-            {
-                std::unique_lock<std::recursive_mutex> guard(lock);
+            while (true) {
+                auto currentTopK = globalTopK.load(std::memory_order_acquire);
 
-                if ((int)globalTopK.size() < k) {
-                    globalTopK.push(record);
-                } else if (dist < globalTopK.top().distance) {
-                    globalTopK.pop();
-                    globalTopK.push(record);
+                auto nextTopK = currentTopK->tryUpdate(record);
+
+                if (nextTopK == nullptr) {
+                    break;
+                }
+
+                if (std::atomic_compare_exchange_strong_explicit(
+                        &globalTopK,
+                        &currentTopK,
+                        nextTopK,
+                        std::memory_order_release,
+                        std::memory_order_acquire)) {
+                    break;
                 }
             }
         }
@@ -267,11 +318,10 @@ private:
     /**
      * @brief Counts label frequencies and returns the majority label.
      */
-    std::string majorityVote(std::priority_queue<DistanceRecord>& topK) {
+    std::string majorityVote(const std::vector<DistanceRecord>& topK) {
         std::map<std::string, int> freq;
-        while (!topK.empty()) {
-            freq[topK.top().neighbor.label]++;
-            topK.pop();
+        for (const auto& r : topK) {
+            freq[r.neighbor.label]++;
         }
         return std::max_element(
             freq.begin(), freq.end(),

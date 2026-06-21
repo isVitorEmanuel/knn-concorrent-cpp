@@ -35,7 +35,6 @@ struct DistanceRecord {
     DistanceRecord(const Neighbor& neighbor, double distance)
         : neighbor(neighbor), distance(distance) {}
 
-    // Max-heap: largest distance has highest priority (to be removed first)
     bool operator<(const DistanceRecord& other) const {
         return this->distance < other.distance;
     }
@@ -99,11 +98,8 @@ private:
         std::cout << "[runParallel] " << chunks.size()
                   << " chunks | target dim=" << target.values.size() << std::endl;
 
-        // Shared global heap — all threads write here under mutex protection
-        // Equivalent to the shared PriorityQueue in Java KNNSync
         std::priority_queue<DistanceRecord> globalTopK;
 
-        // Mutex protecting globalTopK — equivalent to synchronized(globalTopK) in Java
         std::mutex globalMutex;
 
         std::vector<std::thread> threads;
@@ -115,7 +111,6 @@ private:
             });
         }
 
-        // Wait for all threads to finish
         for (std::thread& t : threads) {
             if (t.joinable()) t.join();
         }
@@ -125,7 +120,6 @@ private:
             return "Unknown";
         }
 
-        // No merge needed — globalTopK already contains the final K nearest neighbors
         return majorityVote(globalTopK);
     }
 
@@ -230,13 +224,10 @@ private:
                 continue;
             }
 
-            // Parse and distance are CPU work — done OUTSIDE the lock
-            // Only the heap insertion is protected — same strategy as Java KNNSync
             double dist = calculateEuclideanDistance(target, *current);
             DistanceRecord record(*current, dist);
             delete current;
 
-            // Equivalent to synchronized(globalTopK) { ... } in Java
             {
                 std::lock_guard<std::mutex> lock(globalMutex);
                 if ((int)globalTopK.size() < k) {
@@ -245,7 +236,7 @@ private:
                     globalTopK.pop();
                     globalTopK.push(record);
                 }
-            } // lock released automatically here — std::lock_guard RAII
+            }
         }
     }
 

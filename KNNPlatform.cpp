@@ -7,7 +7,6 @@
 #include <cmath>
 #include <map>
 #include <thread>
-#include <semaphore>
 #include <algorithm>
 
 /**
@@ -26,6 +25,7 @@ public:
 /**
  * @struct DistanceRecord
  * @brief Associates a Neighbor with its computed distance to the target point.
+ *        Used inside the max-heap priority queue to maintain the K nearest neighbors.
  */
 struct DistanceRecord {
     Neighbor neighbor;
@@ -42,6 +42,7 @@ struct DistanceRecord {
 /**
  * @struct ChunkBounds
  * @brief Represents the byte boundaries (start and end) of a file segment.
+ *        Each worker thread receives one ChunkBounds to know its read window.
  */
 struct ChunkBounds {
     long long startByte;
@@ -49,16 +50,17 @@ struct ChunkBounds {
 };
 
 /**
- * @class KNNSemaphore
- * @brief Implements KNN using parallel platform threads with a binary semaphore
- *        protecting only the final merge — one lock per thread, not per line.
- *        Equivalent to the Java KNNSemaphore using java.util.concurrent.Semaphore.
+ * @class KNNPlatform
+ * @brief Implements the K-Nearest Neighbors algorithm using parallel platform threads (std::thread).
+ *        Splits the CSV file into byte-aligned chunks and processes each chunk concurrently.
+ *        Equivalent to the Java KNNPlatform using Thread.ofPlatform().
  */
-class KNNSemaphore {
+class KNNPlatform {
 public:
 
     /**
-     * @brief Entry point for the semaphore-based parallel classification.
+     * @brief Entry point for the parallel stream-based classification.
+     *        Detects available hardware threads and delegates to runParallel().
      *
      * @param filePath  Path to the CSV dataset file.
      * @param target    The data point to classify.
@@ -67,16 +69,15 @@ public:
      */
     std::string predictStream(const std::string& filePath, const Neighbor& target, int k) {
         int numThreads = std::max(2u, std::thread::hardware_concurrency());
-        std::cout << "[Semaphore] Using " << numThreads << " platform threads" << std::endl;
+        std::cout << "[Platform] Using " << numThreads << " platform threads" << std::endl;
         return runParallel(filePath, target, k, numThreads);
     }
 
 private:
 
     /**
-     * @brief Manages the full parallel execution lifecycle.
-     *        Each thread builds a local heap freely, then acquires the semaphore
-     *        only once to merge into the global heap — minimizing contention.
+     * @brief Manages the full parallel execution lifecycle:
+     *        compute chunks → spawn threads → join → merge results → majority vote.
      *
      * @param filePath    Path to the CSV dataset file.
      * @param target      The data point to classify.
@@ -91,21 +92,39 @@ private:
             return "Unknown";
         }
 
-        std::priority_queue<DistanceRecord> globalTopK;
+        std::cout << "[runParallel] " << chunks.size()
+                  << " chunks | target dim=" << target.values.size() << std::endl;
 
-        std::binary_semaphore mutex(1);
+        int numChunks = (int)chunks.size();
 
+        std::vector<std::priority_queue<DistanceRecord>> results(numChunks);
         std::vector<std::thread> threads;
-        threads.reserve(chunks.size());
+        threads.reserve(numChunks);
 
-        for (int i = 0; i < (int)chunks.size(); i++) {
-            threads.emplace_back([this, &filePath, &chunks, &target, &globalTopK, &mutex, i, k]() {
-                processChunk(filePath, chunks[i], target, k, globalTopK, mutex);
+        for (int i = 0; i < numChunks; i++) {
+            threads.emplace_back([this, &filePath, &chunks, &target, &results, i, k]() {
+                results[i] = processChunk(filePath, chunks[i], target, k);
             });
         }
 
         for (std::thread& t : threads) {
             if (t.joinable()) t.join();
+        }
+
+        std::priority_queue<DistanceRecord> globalTopK;
+
+        for (auto& localTopK : results) {
+            std::priority_queue<DistanceRecord> copy = localTopK;
+            while (!copy.empty()) {
+                const DistanceRecord& record = copy.top();
+                if ((int)globalTopK.size() < k) {
+                    globalTopK.push(record);
+                } else if (record.distance < globalTopK.top().distance) {
+                    globalTopK.pop();
+                    globalTopK.push(record);
+                }
+                copy.pop();
+            }
         }
 
         if (globalTopK.empty()) {
@@ -118,6 +137,8 @@ private:
 
     /**
      * @brief Calculates balanced byte chunks across the file, ensuring line alignment.
+     *        Seeks '\n' boundaries so no line is split between two threads.
+     *        Equivalent to computeChunks() using RandomAccessFile in Java.
      *
      * @param filePath   Path to the CSV file.
      * @param numChunks  Desired number of partitions.
@@ -127,17 +148,26 @@ private:
         std::vector<ChunkBounds> chunks;
 
         std::ifstream file(filePath, std::ios::binary | std::ios::ate);
-        if (!file.is_open()) return chunks;
+        if (!file.is_open()) {
+            std::cerr << "Error opening file: " << filePath << std::endl;
+            return chunks;
+        }
 
         long long fileSize = file.tellg();
-        if (fileSize == 0) return chunks;
+        if (fileSize == 0) {
+            std::cerr << "File is empty: " << filePath << std::endl;
+            return chunks;
+        }
 
         file.seekg(0);
         std::string header;
         std::getline(file, header);
 
         long long dataStart = file.tellg();
-        if (dataStart >= fileSize) return chunks;
+        if (dataStart >= fileSize) {
+            std::cerr << "File contains only the header — no data." << std::endl;
+            return chunks;
+        }
 
         long long dataSize     = fileSize - dataStart;
         long long rawChunkSize = dataSize / numChunks;
@@ -151,9 +181,10 @@ private:
             } else {
                 long long rawEnd = dataStart + (long long)(i + 1) * rawChunkSize;
                 file.seekg(rawEnd);
+
                 char c;
                 while (file.get(c) && c != '\n') {}
-                chunkEnd = file.eof() ? fileSize : (long long)file.tellg();
+                chunkEnd = (file.eof()) ? fileSize : (long long)file.tellg();
             }
 
             if (chunkStart < chunkEnd)
@@ -167,31 +198,30 @@ private:
     }
 
     /**
-     * @brief Processes a single file chunk:
-     *        1) Builds a local top-K heap freely — no contention
-     *        2) Acquires the semaphore ONCE to merge local into global
-     *        3) Releases the semaphore immediately after merge
-     *        Equivalent to the acquire/release pattern in Java KNNSemaphore.
+     * @brief Processes a single file chunk assigned to one thread.
+     *        Opens the file independently, seeks to startByte, reads until endByte,
+     *        parses each line, and maintains a local max-heap of size K.
+     *        Equivalent to processChunk() with bounded InputStream in Java.
      *
-     * @param filePath   Path to the CSV file.
-     * @param chunk      Byte boundaries for this thread's work window.
-     * @param target     The data point to classify.
-     * @param k          Number of nearest neighbors to maintain.
-     * @param globalTopK Shared max-heap — written only during merge.
-     * @param mutex      Binary semaphore protecting the merge section.
+     * @param filePath  Path to the CSV file.
+     * @param chunk     Byte boundaries for this thread's work window.
+     * @param target    The data point to classify.
+     * @param k         Number of nearest neighbors to maintain locally.
+     * @return          Local max-heap with the K nearest neighbors found in this chunk.
      */
-    void processChunk(
+    std::priority_queue<DistanceRecord> processChunk(
         const std::string& filePath,
         const ChunkBounds& chunk,
         const Neighbor& target,
-        int k,
-        std::priority_queue<DistanceRecord>& globalTopK,
-        std::binary_semaphore& mutex)
+        int k)
     {
         std::priority_queue<DistanceRecord> localTopK;
 
         std::ifstream file(filePath, std::ios::binary);
-        if (!file.is_open()) return;
+        if (!file.is_open()) {
+            std::cerr << "Error opening file in thread." << std::endl;
+            return localTopK;
+        }
 
         file.seekg(chunk.startByte);
 
@@ -208,36 +238,26 @@ private:
             }
 
             double dist = calculateEuclideanDistance(target, *current);
-            DistanceRecord record(*current, dist);
-            delete current;
 
             if ((int)localTopK.size() < k) {
-                localTopK.push(record);
+                localTopK.push(DistanceRecord(*current, dist));
             } else if (dist < localTopK.top().distance) {
                 localTopK.pop();
-                localTopK.push(record);
+                localTopK.push(DistanceRecord(*current, dist));
             }
+
+            delete current;
         }
 
-        mutex.acquire();
-
-        std::priority_queue<DistanceRecord> copy = localTopK;
-        while (!copy.empty()) {
-            const DistanceRecord& record = copy.top();
-            if ((int)globalTopK.size() < k) {
-                globalTopK.push(record);
-            } else if (record.distance < globalTopK.top().distance) {
-                globalTopK.pop();
-                globalTopK.push(record);
-            }
-            copy.pop();
-        }
-
-        mutex.release();
+        return localTopK;
     }
 
     /**
      * @brief Parses a CSV line into a Neighbor object.
+     *        All columns except the last are feature values; the last is the label.
+     *
+     * @param line  A single CSV line.
+     * @return      Pointer to a new Neighbor, or nullptr if parsing fails.
      */
     Neighbor* parseLineToNeighbor(const std::string& line) {
         std::vector<std::string> parts;
@@ -272,6 +292,10 @@ private:
 
     /**
      * @brief Computes the Euclidean distance between two Neighbor points.
+     *
+     * @param target     The query point.
+     * @param dataPoint  A point from the training dataset.
+     * @return           Euclidean distance as a double.
      */
     double calculateEuclideanDistance(const Neighbor& target, const Neighbor& dataPoint) {
         double sum = 0.0;
@@ -283,7 +307,11 @@ private:
     }
 
     /**
-     * @brief Counts label frequencies and returns the majority label.
+     * @brief Counts label frequencies in the global top-K heap and returns the majority label.
+     *        Equivalent to majorityVote() using HashMap in Java.
+     *
+     * @param topK  Max-heap containing the K nearest neighbors globally.
+     * @return      The label with the highest frequency.
      */
     std::string majorityVote(std::priority_queue<DistanceRecord>& topK) {
         std::map<std::string, int> freq;

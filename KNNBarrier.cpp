@@ -7,7 +7,8 @@
 #include <cmath>
 #include <map>
 #include <thread>
-#include <semaphore>
+#include <barrier>
+#include <functional>
 #include <algorithm>
 
 /**
@@ -49,16 +50,17 @@ struct ChunkBounds {
 };
 
 /**
- * @class KNNSemaphore
- * @brief Implements KNN using parallel platform threads with a binary semaphore
- *        protecting only the final merge — one lock per thread, not per line.
- *        Equivalent to the Java KNNSemaphore using java.util.concurrent.Semaphore.
+ * @class KNNBarrier
+ * @brief Implements KNN using parallel platform threads and a std::barrier
+ *        to synchronize the transition from local processing to global merging.
+ *        The barrier's completion function runs the merge + majority vote
+ *        automatically when all threads arrive — equivalent to CyclicBarrier in Java.
  */
-class KNNSemaphore {
+class KNNBarrier {
 public:
 
     /**
-     * @brief Entry point for the semaphore-based parallel classification.
+     * @brief Entry point for the barrier-based parallel classification.
      *
      * @param filePath  Path to the CSV dataset file.
      * @param target    The data point to classify.
@@ -67,16 +69,18 @@ public:
      */
     std::string predictStream(const std::string& filePath, const Neighbor& target, int k) {
         int numThreads = std::max(2u, std::thread::hardware_concurrency());
-        std::cout << "[Semaphore] Using " << numThreads << " platform threads" << std::endl;
+        std::cout << "[CyclicBarrier] Using " << numThreads
+                  << " platform threads with phase barrier synchronization" << std::endl;
         return runParallel(filePath, target, k, numThreads);
     }
 
 private:
 
     /**
-     * @brief Manages the full parallel execution lifecycle.
-     *        Each thread builds a local heap freely, then acquires the semaphore
-     *        only once to merge into the global heap — minimizing contention.
+     * @brief Manages the full barrier-based parallel execution.
+     *        Creates a std::barrier with a completion function that performs
+     *        the merge and majority vote when all threads arrive.
+     *        The main thread also participates in the barrier — same as Java.
      *
      * @param filePath    Path to the CSV dataset file.
      * @param target      The data point to classify.
@@ -91,37 +95,63 @@ private:
             return "Unknown";
         }
 
-        std::priority_queue<DistanceRecord> globalTopK;
+        std::cout << "[runParallel] " << chunks.size()
+                  << " chunks | target dim=" << target.values.size() << std::endl;
 
-        std::binary_semaphore mutex(1);
+        int numChunks = (int)chunks.size();
+
+        std::vector<std::priority_queue<DistanceRecord>> results(numChunks);
+
+        std::string finalLabel = "Unknown";
+
+        auto completionFn = [&]() noexcept {
+            std::priority_queue<DistanceRecord> globalTopK;
+
+            for (auto& localTopK : results) {
+                std::priority_queue<DistanceRecord> copy = localTopK;
+                while (!copy.empty()) {
+                    const DistanceRecord& record = copy.top();
+                    if ((int)globalTopK.size() < k) {
+                        globalTopK.push(record);
+                    } else if (record.distance < globalTopK.top().distance) {
+                        globalTopK.pop();
+                        globalTopK.push(record);
+                    }
+                    copy.pop();
+                }
+            }
+
+            if (globalTopK.empty()) {
+                finalLabel = "Unknown";
+            } else {
+                finalLabel = majorityVote(globalTopK);
+            }
+        };
+
+        std::barrier sync(numChunks + 1, completionFn);
 
         std::vector<std::thread> threads;
-        threads.reserve(chunks.size());
+        threads.reserve(numChunks);
 
-        for (int i = 0; i < (int)chunks.size(); i++) {
-            threads.emplace_back([this, &filePath, &chunks, &target, &globalTopK, &mutex, i, k]() {
-                processChunk(filePath, chunks[i], target, k, globalTopK, mutex);
+        for (int i = 0; i < numChunks; i++) {
+            threads.emplace_back([this, &filePath, &chunks, &target, &results, &sync, i, k]() {
+                results[i] = processChunk(filePath, chunks[i], target, k);
+
+                sync.arrive_and_wait();
             });
         }
+
+        sync.arrive_and_wait();
 
         for (std::thread& t : threads) {
             if (t.joinable()) t.join();
         }
 
-        if (globalTopK.empty()) {
-            std::cerr << "Error: no valid neighbors found." << std::endl;
-            return "Unknown";
-        }
-
-        return majorityVote(globalTopK);
+        return finalLabel;
     }
 
     /**
-     * @brief Calculates balanced byte chunks across the file, ensuring line alignment.
-     *
-     * @param filePath   Path to the CSV file.
-     * @param numChunks  Desired number of partitions.
-     * @return           Vector of ChunkBounds, one per thread.
+     * @brief Calculates balanced byte chunks ensuring line alignment.
      */
     std::vector<ChunkBounds> computeChunks(const std::string& filePath, int numChunks) {
         std::vector<ChunkBounds> chunks;
@@ -167,31 +197,18 @@ private:
     }
 
     /**
-     * @brief Processes a single file chunk:
-     *        1) Builds a local top-K heap freely — no contention
-     *        2) Acquires the semaphore ONCE to merge local into global
-     *        3) Releases the semaphore immediately after merge
-     *        Equivalent to the acquire/release pattern in Java KNNSemaphore.
-     *
-     * @param filePath   Path to the CSV file.
-     * @param chunk      Byte boundaries for this thread's work window.
-     * @param target     The data point to classify.
-     * @param k          Number of nearest neighbors to maintain.
-     * @param globalTopK Shared max-heap — written only during merge.
-     * @param mutex      Binary semaphore protecting the merge section.
+     * @brief Processes a single file chunk and returns a local max-heap of top-K neighbors.
      */
-    void processChunk(
+    std::priority_queue<DistanceRecord> processChunk(
         const std::string& filePath,
         const ChunkBounds& chunk,
         const Neighbor& target,
-        int k,
-        std::priority_queue<DistanceRecord>& globalTopK,
-        std::binary_semaphore& mutex)
+        int k)
     {
         std::priority_queue<DistanceRecord> localTopK;
 
         std::ifstream file(filePath, std::ios::binary);
-        if (!file.is_open()) return;
+        if (!file.is_open()) return localTopK;
 
         file.seekg(chunk.startByte);
 
@@ -219,21 +236,7 @@ private:
             }
         }
 
-        mutex.acquire();
-
-        std::priority_queue<DistanceRecord> copy = localTopK;
-        while (!copy.empty()) {
-            const DistanceRecord& record = copy.top();
-            if ((int)globalTopK.size() < k) {
-                globalTopK.push(record);
-            } else if (record.distance < globalTopK.top().distance) {
-                globalTopK.pop();
-                globalTopK.push(record);
-            }
-            copy.pop();
-        }
-
-        mutex.release();
+        return localTopK;
     }
 
     /**
@@ -285,7 +288,7 @@ private:
     /**
      * @brief Counts label frequencies and returns the majority label.
      */
-    std::string majorityVote(std::priority_queue<DistanceRecord>& topK) {
+    std::string majorityVote(std::priority_queue<DistanceRecord> topK) {
         std::map<std::string, int> freq;
         while (!topK.empty()) {
             freq[topK.top().neighbor.label]++;

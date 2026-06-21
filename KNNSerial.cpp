@@ -34,7 +34,6 @@ struct DistanceRecord {
     DistanceRecord(const Neighbor& neighbor, double distance)
         : neighbor(neighbor), distance(distance) {}
 
-    // Max-heap: largest distance has highest priority (to be removed first)
     bool operator<(const DistanceRecord& other) const {
         return this->distance < other.distance;
     }
@@ -59,7 +58,6 @@ public:
      * @return          Predicted class label, or "Unknown" if no valid data found.
      */
     std::string predictStream(const std::string& filePath, const Neighbor& target, int k) {
-        // Max-heap: keeps the K smallest distances by evicting the largest
         std::priority_queue<DistanceRecord> pq;
 
         std::ifstream file(filePath);
@@ -72,7 +70,6 @@ public:
         bool firstLine = true;
 
         while (std::getline(file, line)) {
-            // Skip header line
             if (firstLine) {
                 firstLine = false;
                 continue;
@@ -90,7 +87,6 @@ public:
             pq.push(DistanceRecord(*current, dist));
             delete current;
 
-            // Keep only K nearest: remove the farthest if heap exceeds K
             if ((int)pq.size() > k) {
                 pq.pop();
             }
@@ -100,7 +96,6 @@ public:
 
         if (pq.empty()) return "Unknown";
 
-        // Count label frequencies among the K nearest neighbors
         std::map<std::string, int> labelFrequencies;
         while (!pq.empty()) {
             const std::string& label = pq.top().neighbor.label;
@@ -108,7 +103,6 @@ public:
             pq.pop();
         }
 
-        // Return the label with highest frequency
         return std::max_element(
             labelFrequencies.begin(),
             labelFrequencies.end(),
@@ -141,7 +135,6 @@ private:
         std::vector<double> values;
         try {
             for (size_t i = 0; i < parts.size() - 1; i++) {
-                // Remove whitespace
                 std::string cleaned;
                 for (char c : parts[i]) {
                     if (!std::isspace(c)) cleaned += c;
@@ -149,7 +142,6 @@ private:
                 values.push_back(std::stod(cleaned));
             }
 
-            // Trim label
             std::string label = parts.back();
             label.erase(0, label.find_first_not_of(" \t\r\n"));
             label.erase(label.find_last_not_of(" \t\r\n") + 1);

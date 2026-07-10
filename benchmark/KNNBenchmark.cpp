@@ -14,6 +14,9 @@
 #include <atomic>
 #include <memory>
 #include <algorithm>
+#include <future>
+#include <execution>
+#include <numeric>
 
 static const std::string FILE_PATH   = "dataset_high_dim.csv";
 static const int         K           = 21;
@@ -350,6 +353,69 @@ static void BM_Atomic(benchmark::State& state) {
     }
 }
 BENCHMARK(BM_Atomic)->Name("test09_Atomic")->Unit(benchmark::kSecond);
+
+static void BM_CallableFuture(benchmark::State& state) {
+    for (auto _ : state) {
+        auto chunks = computeChunks(FILE_PATH, NUM_THREADS);
+
+        // Um std::future por chunk — análogo ao List<Future<...>> do
+        // ExecutorService.invokeAll() na versão Java.
+        std::vector<std::future<std::priority_queue<DistanceRecord>>> futures;
+        futures.reserve(chunks.size());
+        for (int i = 0; i < (int)chunks.size(); i++) {
+            futures.push_back(std::async(std::launch::async,
+                [&, i]() { return processChunk(FILE_PATH, chunks[i], TARGET, K); }));
+        }
+
+        std::priority_queue<DistanceRecord> global;
+        for (auto& f : futures) {
+            auto local = f.get();
+            mergeLocal(global, local, K);
+        }
+
+        std::string result = majorityVote(global);
+        benchmark::DoNotOptimize(result);
+    }
+}
+BENCHMARK(BM_CallableFuture)->Name("test16_CallableFuture")->Unit(benchmark::kSecond);
+
+static void BM_ParallelStream(benchmark::State& state) {
+    for (auto _ : state) {
+        auto chunks = computeChunks(FILE_PATH, NUM_THREADS);
+        std::priority_queue<DistanceRecord> empty;
+
+        // transform_reduce(par, first, last, init, binary_op, unary_op):
+        //   unary_op  == map():    ChunkBounds -> Top-K local daquele chunk
+        //   binary_op == reduce(): combina dois Top-K locais associativamente
+        std::priority_queue<DistanceRecord> global = std::transform_reduce(
+            std::execution::par,
+            chunks.begin(), chunks.end(),
+            empty,
+            [](std::priority_queue<DistanceRecord> a, std::priority_queue<DistanceRecord> b) {
+                std::priority_queue<DistanceRecord> merged;
+                for (auto* src : {&a, &b}) {
+                    while (!src->empty()) {
+                        auto& r = src->top();
+                        if ((int)merged.size() < K) {
+                            merged.push(r);
+                        } else if (r.distance < merged.top().distance) {
+                            merged.pop();
+                            merged.push(r);
+                        }
+                        src->pop();
+                    }
+                }
+                return merged;
+            },
+            [](const ChunkBounds& chunk) {
+                return processChunk(FILE_PATH, chunk, TARGET, K);
+            });
+
+        std::string result = majorityVote(global);
+        benchmark::DoNotOptimize(result);
+    }
+}
+BENCHMARK(BM_ParallelStream)->Name("test17_ParallelStream")->Unit(benchmark::kSecond);
 
 
 BENCHMARK_MAIN();
